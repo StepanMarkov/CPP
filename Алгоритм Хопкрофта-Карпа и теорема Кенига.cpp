@@ -18,28 +18,28 @@
 using namespace std;
 struct line;
 
-struct node {
-	list<pair<node*,line*>> lines;
-	bool selected = false;
-	size_t free = 0;
+struct node {				//вершина
+	list<pair<node*,line*>> lines;	//вершины содержат указатель на инцедентное ребро и указатель на соседнюю вершину
+	bool selected = false;		//вспомогательное поле для обхода графа
+	size_t free = 0;		//поле, указывающее инцедентна ли вершина с паросочетанием
 };
 
-struct line {
-	pair<node*, node*> nodes;
-	bool selected = false;
-	bool solution = false;
+struct line {				//ребро
+	pair<node*, node*> nodes;	//поле, указывающее из каких вершин состоит ребро
+	bool selected = false;		//вспомогательное поле для обхода графа
+	bool solution = false;		//поле, указывающее является относится ли ребро к паросочетанию
 };
 
 int main() {
 
 	size_t v1, v2, e; cin >> v1 >> v2 >> e;
 	size_t v(v1 + v2), index1(0), index2(0);
-	auto lines(new line[e]), lend(lines + e);
-	auto nodes(new node[v]), nend(nodes + v), nend1(nodes+v1);
-	list<line*> wayline;
-	list<node*> waynode;
+	auto lines(new line[e]), lend(lines + e);			//выделение памяти для ребер
+	auto nodes(new node[v]), nend(nodes + v), nend1(nodes+v1);	//выделение памяти для вершин
+	list<line*> wayline;						//контейнер для хранения расширяющихся путей
+	list<node*> waynode;						//вспомогательный контейнер для обхода в глубину
 
-	for (auto pline(lines); pline != lend; ++pline) {
+	for (auto pline(lines); pline != lend; ++pline) {		//считываем данные
 		cin >> index1 >> index2;
 		auto node1(nodes + index1);
 		auto node2(nodes + index2);
@@ -50,63 +50,67 @@ int main() {
 
 	//------------------------------------//
 
-	do {
+	do {	//итерации в алгоритме Хопкрофта-Карпа
 
-		for (auto& x : wayline)
-			if (x->solution) {
-				x->solution = false;
-				--x->nodes.first->free;
-				--x->nodes.second->free;
+		for (auto& x : wayline)				//цикл по расширяющимся путям
+			if (x->solution) {			//если ребро пути находится в текущем паросочетании
+				x->solution = false;		//исключаем ребро из паросочетания
+				--x->nodes.first->free;		//помечаем в вершинах, что они инцедентное ребро
+				--x->nodes.second->free;	//исключено из паросочетания
 			}
 			else {
-				x->solution = true;
-				++x->nodes.first->free;
-				++x->nodes.second->free;
+				x->solution = true;		//добавляем реберо в паросочетание
+				++x->nodes.first->free;		//помечаем, что вершина инцедентно с ребром
+				++x->nodes.second->free;	//которое относится к паросочтатанию
 			}
 
-		wayline.clear();
+		wayline.clear();				//подготавливаемся к поиску расширяющихся путей
 
 		for (auto pnode(nodes); pnode != nend; ++pnode)
 			pnode->selected = false;
 
-		for (auto p1(nodes); p1 != nend; ++p1) {
+		for (auto p1(nodes); p1 != nend; ++p1) {	//цикл для поиска расширяющихся путей
 
-			if (p1->free)		continue;
-			if (p1->selected)	continue;
-			p1->selected = true;
-			auto p2(p1);
-			auto sw(false);
+			if (p1->free)		continue;	//первая вершина пути должна быть свободна
+			if (p1->selected)	continue;	//расширяющиеся пути не должны пересекаться
+			p1->selected = true;			//помечаем, что мы здесь были
+			auto p2(p1);				//впомогательная локалльная переменная - конец расширающегося пути
+			auto sw(false);				//впомогательная переменная, отвечающеся за переменный порядок паросочетаний в пути
 			waynode.clear();
 
 			DFS1:
-			for (auto& x : p2->lines) {
-				if (x.first->selected) continue;
-				if (sw ^ x.second->solution) continue;
-				wayline.push_back(x.second);
-				waynode.push_back(p2);
-				p2 = x.first;
-				p2->selected = true;
-				sw = !sw;
-				if (p2->free) goto DFS1;
-				else break;
+			for (auto& x : p2->lines) {			//цикл по инцедентным ребрам
+				if (x.first->selected) continue;	//соседную вершину уже обходили
+				if (sw ^ x.second->solution) continue;	//не тот порядок паросочетания в пути
+				wayline.push_back(x.second);		//добаяляем ребро в расширяющийся путь
+				waynode.push_back(p2);			//добаялем вершину (для обхода в глубину)
+				p2 = x.first;				//переходим к следующей вершине
+				p2->selected = true;			//помечаем, что вершину уже проходили
+				sw = !sw;				//меняем порядок паросочетания
+				if (p2->free) goto DFS1;		//поиск в глубину, если не достигли свободной вершины
+				else break;				//если наши свобоную вершину, поиск завершен
 			}
 
-			if ((!waynode.empty()) && (p2->free)) {
-				p2 = waynode.back();
-				waynode.pop_back();
-				wayline.pop_back();
-				sw = !sw;
-				goto DFS1;
+			if ((!waynode.empty()) && (p2->free)) {		//не удлось найти свободную вершину
+				p2 = waynode.back();			//отходим назад
+				waynode.pop_back();			//исключаем последную вершину из обхода в глубину
+				wayline.pop_back();			//исключаем послуюнее ребро в искомом пути
+				sw = !sw;				//меняем порядок паросочетания
+				goto DFS1;				//возвращаемся к поску
 			}
 		}
-	} while (!wayline.empty());
+	} while (!wayline.empty());					//продолжаем итерации, пока не получится найти расширающйися путь
+	
+	//на этом этапе мы нашли максимальное паросочетание
+	//по теореме Кенига можно найти минимальное вершиное покрытие
+	//используя максимальное паросочетание
 
-	for (auto pnode(nodes); pnode != nend; ++pnode)
+	for (auto pnode(nodes); pnode != nend; ++pnode)			//подготавливаемся к поиску минимального вершиного покрытия
 		pnode->selected = false;
 		
-	for (auto p1(nodes); p1 != nend1; ++p1) {
-	
-		if (p1->free)		continue;
+	for (auto p1(nodes); p1 != nend1; ++p1) {			//цикл по первой доле двудольного графа
+									//алгоритм похож на итерацию в алгоритме Хопкрофта-Карпа
+		if (p1->free)		continue;			
 		if (p1->selected)	continue;
 		p1->selected = true;
 		auto p2(p1);
@@ -134,7 +138,7 @@ int main() {
 
 	//--------------------------------------------------//
 
-	cout << v1 << ' ' << v2 << ' ' << e << endl;
+	cout << v1 << ' ' << v2 << ' ' << e << endl;		//выводим результат в неоходимом формате
 
 	for (auto pline(lines); pline != lend; ++pline) {
 		cout << pline->nodes.first  - nodes << ' ';
